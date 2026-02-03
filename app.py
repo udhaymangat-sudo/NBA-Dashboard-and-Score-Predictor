@@ -9,8 +9,8 @@ import streamlit as st
 BALLEDONTLIE_BASE_URL = "https://api.balldontlie.io/v1"
 ODDS_API_BASE_URL = "https://api.the-odds-api.com/v4"
 
-DEFAULT_BALLDONTLIE_KEY = os.getenv("BALLDONTLIE_API_KEY", "4e335fcf-f133-493f-9fa0-015417f3dc6f")
-DEFAULT_ODDS_KEY = os.getenv("ODDS_API_KEY", "a17a6e90cf7065d09edee849f3f80e98")
+DEFAULT_BALLDONTLIE_KEY = os.getenv("BALLDONTLIE_API_KEY", "")
+DEFAULT_ODDS_KEY = os.getenv("ODDS_API_KEY", "")
 
 
 @st.cache_data(ttl=300)
