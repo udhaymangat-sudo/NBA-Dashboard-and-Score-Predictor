@@ -45,9 +45,20 @@ def get_season_averages(api_key: str, team_id: int, season: int) -> Optional[Dic
     return season_data[0] if season_data else None
 
 
-def get_team_stats_last_games(api_key: str, team_id: int, games_back: int = 5) -> List[Dict[str, Any]]:
+def get_team_stats_last_games(
+    api_key: str,
+    team_id: int,
+    season: int,
+    games_back: int = 5,
+) -> List[Dict[str, Any]]:
     headers = api_headers(api_key)
-    params = {"team_ids[]": team_id, "per_page": games_back, "postseason": "false"}
+    params = {
+        "team_ids[]": team_id,
+        "seasons[]": season,
+        "per_page": games_back,
+        "postseason": "false",
+        "end_date": today_date_iso(),
+    }
     data = fetch_json(f"{BALLEDONTLIE_BASE_URL}/games", headers=headers, params=params)
     return data.get("data", [])
 
@@ -89,40 +100,53 @@ def compute_prediction(
         away_avg = None
 
     try:
-        home_recent = get_team_stats_last_games(api_key, home_team["id"])
+        home_recent = get_team_stats_last_games(api_key, home_team["id"], season)
     except requests.RequestException:
         home_recent = []
     try:
-        away_recent = get_team_stats_last_games(api_key, away_team["id"])
+        away_recent = get_team_stats_last_games(api_key, away_team["id"], season)
     except requests.RequestException:
         away_recent = []
 
     def recent_points(games: List[Dict[str, Any]], team_id: int) -> List[int]:
         points = []
         for game in games:
+            home_score = game.get("home_team_score", 0)
+            visitor_score = game.get("visitor_team_score", 0)
+            status = str(game.get("status", "")).lower()
+            if home_score == 0 and visitor_score == 0 and "final" not in status:
+                continue
             if game.get("home_team", {}).get("id") == team_id:
-                points.append(game.get("home_team_score", 0))
+                points.append(home_score)
             elif game.get("visitor_team", {}).get("id") == team_id:
-                points.append(game.get("visitor_team_score", 0))
+                points.append(visitor_score)
         return points
 
     home_recent_pts = recent_points(home_recent, home_team["id"])
     away_recent_pts = recent_points(away_recent, away_team["id"])
 
-    home_avg_pts = home_avg.get("pts", 110) if home_avg else 110
-    away_avg_pts = away_avg.get("pts", 110) if away_avg else 110
+    home_avg_pts = home_avg.get("pts") if home_avg else None
+    away_avg_pts = away_avg.get("pts") if away_avg else None
 
-    recent_home = sum(home_recent_pts) / len(home_recent_pts) if home_recent_pts else home_avg_pts
-    recent_away = sum(away_recent_pts) / len(away_recent_pts) if away_recent_pts else away_avg_pts
+    recent_home = sum(home_recent_pts) / len(home_recent_pts) if home_recent_pts else None
+    recent_away = sum(away_recent_pts) / len(away_recent_pts) if away_recent_pts else None
 
-    base_total = (home_avg_pts + away_avg_pts) / 2
-    recent_total = (recent_home + recent_away) / 2
-    model_total = round((base_total * 0.55 + recent_total * 0.45) * 2, 1)
     market_total = compute_market_total(
         odds_data,
         home_team.get("full_name", ""),
         away_team.get("full_name", ""),
     )
+    fallback_base = (market_total / 2) if market_total else 110
+    home_base = home_avg_pts if home_avg_pts is not None else (recent_home if recent_home is not None else fallback_base)
+    away_base = away_avg_pts if away_avg_pts is not None else (recent_away if recent_away is not None else fallback_base)
+
+    base_total = (home_base + away_base) / 2
+    recent_total = (
+        (recent_home + recent_away) / 2
+        if recent_home is not None and recent_away is not None
+        else base_total
+    )
+    model_total = round((base_total * 0.55 + recent_total * 0.45) * 2, 1)
     if market_total:
         predicted_total = round(model_total * 0.4 + market_total * 0.6, 1)
     else:
@@ -346,10 +370,14 @@ else:
                 "Predicted Total": prediction["predicted_total"],
                 "Confidence": f"{prediction['confidence']:.0%}",
                 "Market Total": prediction["market_total"],
-                "Home Avg PTS": round(prediction["home_avg_pts"], 1),
-                "Away Avg PTS": round(prediction["away_avg_pts"], 1),
-                "Recent Home PTS": round(prediction["recent_home_pts"], 1),
-                "Recent Away PTS": round(prediction["recent_away_pts"], 1),
+                "Home Avg PTS": round(prediction["home_avg_pts"], 1) if prediction["home_avg_pts"] is not None else None,
+                "Away Avg PTS": round(prediction["away_avg_pts"], 1) if prediction["away_avg_pts"] is not None else None,
+                "Recent Home PTS": round(prediction["recent_home_pts"], 1)
+                if prediction["recent_home_pts"] is not None
+                else None,
+                "Recent Away PTS": round(prediction["recent_away_pts"], 1)
+                if prediction["recent_away_pts"] is not None
+                else None,
             }
         )
 
@@ -364,3 +392,4 @@ st.markdown(
     falls back to season averages and reports lower confidence.
     """
 )
+requirements.txt
