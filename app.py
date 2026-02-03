@@ -146,7 +146,8 @@ with st.sidebar:
     st.header("API Keys")
     odds_key = st.text_input("Odds API Key", value=DEFAULT_ODDS_KEY, type="password")
     balldontlie_key = st.text_input("BallDontLie API Key", value=DEFAULT_BALLDONTLIE_KEY, type="password")
-    season = st.number_input("Season", min_value=2000, max_value=2025, value=datetime.now().year)
+    current_year = datetime.now().year
+    season = st.number_input("Season", min_value=2000, max_value=current_year, value=current_year)
 
 if not odds_key or not balldontlie_key:
     st.warning("Provide both API keys to load data.")
