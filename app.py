@@ -117,14 +117,14 @@ def compute_prediction(
 
     base_total = (home_avg_pts + away_avg_pts) / 2
     recent_total = (recent_home + recent_away) / 2
-    model_total = round((base_total * 0.6 + recent_total * 0.4) * 2, 1)
+    model_total = round((base_total * 0.55 + recent_total * 0.45) * 2, 1)
     market_total = compute_market_total(
         odds_data,
         home_team.get("full_name", ""),
         away_team.get("full_name", ""),
     )
     if market_total:
-        predicted_total = round(model_total * 0.7 + market_total * 0.3, 1)
+        predicted_total = round(model_total * 0.4 + market_total * 0.6, 1)
     else:
         predicted_total = model_total
 
@@ -141,7 +141,15 @@ def compute_prediction(
     if leaders:
         data_coverage += 0.05
 
-    confidence = max(0.1, min(0.95, data_coverage - injury_penalty))
+    confidence_adjustment = 0.0
+    if market_total:
+        market_gap = abs(predicted_total - market_total)
+        if market_gap <= 3:
+            confidence_adjustment += 0.05
+        elif market_gap >= 8:
+            confidence_adjustment -= 0.05
+
+    confidence = max(0.1, min(0.95, data_coverage - injury_penalty + confidence_adjustment))
 
     return {
         "predicted_total": predicted_total,
