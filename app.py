@@ -235,4 +235,4 @@ st.markdown(
     the balldontlie.io OpenAPI endpoints, along with contextual betting odds from the Odds API.
     When any endpoint is unavailable, the model falls back to season averages and marks a lower
     confidence score.
-    """
+    """)
