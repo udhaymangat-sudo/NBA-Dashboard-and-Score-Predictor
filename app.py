@@ -79,11 +79,23 @@ def compute_prediction(
     standings: List[Dict[str, Any]],
     leaders: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    home_avg = get_season_averages(api_key, home_team["id"], season)
-    away_avg = get_season_averages(api_key, away_team["id"], season)
+    try:
+        home_avg = get_season_averages(api_key, home_team["id"], season)
+    except requests.RequestException:
+        home_avg = None
+    try:
+        away_avg = get_season_averages(api_key, away_team["id"], season)
+    except requests.RequestException:
+        away_avg = None
 
-    home_recent = get_team_stats_last_games(api_key, home_team["id"])
-    away_recent = get_team_stats_last_games(api_key, away_team["id"])
+    try:
+        home_recent = get_team_stats_last_games(api_key, home_team["id"])
+    except requests.RequestException:
+        home_recent = []
+    try:
+        away_recent = get_team_stats_last_games(api_key, away_team["id"])
+    except requests.RequestException:
+        away_recent = []
 
     def recent_points(games: List[Dict[str, Any]], team_id: int) -> List[int]:
         points = []
@@ -106,7 +118,11 @@ def compute_prediction(
     base_total = (home_avg_pts + away_avg_pts) / 2
     recent_total = (recent_home + recent_away) / 2
     model_total = round((base_total * 0.6 + recent_total * 0.4) * 2, 1)
-    market_total = compute_market_total(odds_data, home_team.get("full_name"), away_team.get("full_name"))
+    market_total = compute_market_total(
+        odds_data,
+        home_team.get("full_name", ""),
+        away_team.get("full_name", ""),
+    )
     if market_total:
         predicted_total = round(model_total * 0.7 + market_total * 0.3, 1)
     else:
@@ -306,19 +322,16 @@ else:
     for game in games_today:
         home = game.get("home_team", {})
         away = game.get("visitor_team", {})
-        try:
-            prediction = compute_prediction(
-                home,
-                away,
-                season,
-                balldontlie_key,
-                injuries_data,
-                odds_data,
-                standings_data,
-                leaders_data,
-            )
-        except requests.HTTPError:
-            continue
+        prediction = compute_prediction(
+            home,
+            away,
+            season,
+            balldontlie_key,
+            injuries_data,
+            odds_data,
+            standings_data,
+            leaders_data,
+        )
         prediction_rows.append(
             {
                 "Matchup": f"{away.get('full_name')} at {home.get('full_name')}",
